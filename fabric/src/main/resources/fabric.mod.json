@@ -17,8 +17,8 @@
     "main": [
       "com.jakeberryman.svcdiscordintegration.fabric.SvcDiscordIntegrationFabric"
     ],
-    "client": [
-      "com.jakeberryman.svcdiscordintegration.fabric.client.SvcDiscordIntegrationFabricClient"
+    "voicechat": [
+      "com.jakeberryman.svcdiscordintegration.fabric.ForgeSvcPlugin"
     ]
   },
   "mixins": [

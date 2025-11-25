@@ -46,7 +46,9 @@ dependencies {
         }
     }
 
-    implementation "de.maxhenkel.voicechat:voicechat-api:$rootProject.voicechat_api_version"
+    //implementation "de.maxhenkel.voicechat:voicechat-api:$rootProject.voicechat_api_version"
+    implementation "de.maxhenkel.voicechat:voicechat-api:2.6.0"
+
     // Use modRuntimeOnly instead of runtimeOnly to prevent classpath pollution
     modRuntimeOnly "maven.modrinth:simple-voice-chat:fabric-$rootProject.minecraft_version-$rootProject.voicechat_version"
 }

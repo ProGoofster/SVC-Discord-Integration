@@ -11,6 +11,7 @@ public class BotInstance {
     private final String token;
     private JDA api;
     private final CommandHandler commandHandler;
+    private final DiscordEventHandler eventHandler;
 
     private volatile boolean busy = false;
     private volatile String currentActivity = "Waiting for bridge";
@@ -19,12 +20,13 @@ public class BotInstance {
         this.id = id;
         this.token = token;
         this.commandHandler = new CommandHandler();
+        this.eventHandler = new DiscordEventHandler();
     }
 
     public void startBot() {
         api = JDABuilder.createDefault(token)
                 .setActivity(Activity.playing("hello from minecraft"))
-                .addEventListeners(commandHandler)
+                .addEventListeners(commandHandler, eventHandler)
                 .build();
 
         commandHandler.registerCommands(api);
