@@ -10,6 +10,9 @@ public final class SvcDiscordIntegrationFabric implements ModInitializer {
         // However, some things (like resources) may still be uninitialized.
         // Proceed with mild caution.
 
+        // Register config
+        FabricConfig.register();
+
         // Run our common setup.
         SvcDiscordIntegration.init();
     }

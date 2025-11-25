@@ -28,31 +28,73 @@ configurations {
         canBeResolved = true
         canBeConsumed = false
     }
+
+    // Exclude Simple Voice Chat from dev environment to prevent mapping conflicts
+    developmentForge {
+        exclude group: 'maven.modrinth', module: 'simple-voice-chat'
+    }
 }
 
 dependencies {
     forge "net.minecraftforge:forge:$rootProject.forge_version"
 
-
     common(project(path: ':common', configuration: 'namedElements')) { transitive false }
     shadowBundle project(path: ':common', configuration: 'transformProductionForge')
 
-    // Bundle Discord4J into the Forge JAR
-    shadowBundle 'com.discord4j:discord4j-core:3.2.6'
-    shadowBundle 'com.discord4j:discord4j-voice:3.2.6'
+    forgeRuntimeLibrary("net.dv8tion:JDA:${jda_version}") {
+        exclude module: 'opus-java'
+        exclude group: 'com.iwebpp.crypto'
+    }
+    shadowBundle("net.dv8tion:JDA:${jda_version}") {
+        exclude module: 'opus-java'
+        exclude group: 'com.iwebpp.crypto'
+    }
+
+
+    implementation "de.maxhenkel.voicechat:voicechat-api:$rootProject.voicechat_api_version"
+    // Use modRuntimeOnly instead of runtimeOnly to prevent classpath pollution
+    modRuntimeOnly "maven.modrinth:simple-voice-chat:forge-$rootProject.minecraft_version-$rootProject.voicechat_version"
 }
 
 processResources {
     inputs.property 'version', project.version
+    inputs.property 'voicechat_api_version', rootProject.voicechat_api_version
 
     filesMatching('META-INF/mods.toml') {
-        expand version: project.version
+        expand(
+                version: project.version,
+                voicechat_api_version: rootProject.voicechat_api_version
+        )
     }
 }
 
 shadowJar {
     configurations = [project.configurations.shadowBundle]
     archiveClassifier = 'dev-shadow'
+
+    // Relocate JDA and its dependencies to avoid conflicts
+    def relocateLocation = "${project.group}.shadow"
+    def relocations = [
+        'net.dv8tion.jda',
+        'com.squareup.okhttp3',
+        'okio',
+        'com.fasterxml.jackson',
+        'org.slf4j',
+        'com.neovisionaries.ws',
+        'gnu.trove',
+        'org.apache.commons.collections4',
+        'club.minnced.opus'
+    ]
+
+    relocations.each { pkg ->
+        relocate pkg, "${relocateLocation}.${pkg}"
+    }
+
+    // Exclude duplicate metadata that can cause issues
+    exclude 'META-INF/services/**'
+    exclude 'META-INF/*.SF'
+    exclude 'META-INF/*.DSA'
+    exclude 'META-INF/*.RSA'
 }
 
 remapJar {
