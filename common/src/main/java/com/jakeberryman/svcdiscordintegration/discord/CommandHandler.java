@@ -86,8 +86,10 @@ public class CommandHandler extends ListenerAdapter {
         //manager.setSendingHandler(new MySendHandler());
         manager.openAudioConnection(voiceChannel);
 
+        // Connect Discord to the voice chat group
+        SvcPlugin.joinDiscordToGroup(group, voiceChannel.getIdLong());
 
-        event.reply("Join command received for group: " + group.getName() + " from voice channel: " + voiceChannel.getName() + " (not yet implemented)").setEphemeral(true).queue();
+        event.reply("Discord bot joined voice channel: " + voiceChannel.getName() + " and connected to group: " + group.getName()).setEphemeral(true).queue();
     }
 
     private void handleLeaveCommand(SlashCommandInteractionEvent event) {

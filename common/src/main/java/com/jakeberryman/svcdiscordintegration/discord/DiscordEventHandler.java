@@ -1,5 +1,7 @@
 package com.jakeberryman.svcdiscordintegration.discord;
 
+import com.jakeberryman.svcdiscordintegration.voicechat.SvcPlugin;
+import de.maxhenkel.voicechat.api.Group;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.unions.AudioChannelUnion;
 import net.dv8tion.jda.api.events.guild.voice.GuildVoiceUpdateEvent;
@@ -27,6 +29,16 @@ public class DiscordEventHandler extends ListenerAdapter {
 
         // If no humans left, disconnect the bot
         if (humanCount == 0) {
+            long channelId = channelLeft.getIdLong();
+
+            // Find and disconnect from any associated voice chat group
+            for (Group group : SvcPlugin.groups) {
+                if (SvcPlugin.isDiscordConnected(group)) {
+                    SvcPlugin.leaveDiscordFromGroup(group);
+                    break;
+                }
+            }
+
             audioManager.closeAudioConnection();
             System.out.println("Bot left voice channel '" + channelLeft.getName() + "' because it was empty.");
         }
