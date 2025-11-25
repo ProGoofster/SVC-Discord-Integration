@@ -1,5 +1,7 @@
 package com.jakeberryman.svcdiscordintegration.discord;
 
+import com.jakeberryman.svcdiscordintegration.SvcDiscordIntegration;
+import com.jakeberryman.svcdiscordintegration.audio.AudioBridge;
 import com.jakeberryman.svcdiscordintegration.voicechat.SvcPlugin;
 import de.maxhenkel.voicechat.api.Group;
 import net.dv8tion.jda.api.JDA;
@@ -12,6 +14,12 @@ import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.managers.AudioManager;
 
 public class CommandHandler extends ListenerAdapter {
+
+    private final BotInstance botInstance;
+
+    public CommandHandler(BotInstance botInstance) {
+        this.botInstance = botInstance;
+    }
 
     public void registerCommands(JDA api) {
         api.updateCommands().addCommands(
@@ -54,18 +62,26 @@ public class CommandHandler extends ListenerAdapter {
     }
 
     private void handleJoinCommand(SlashCommandInteractionEvent event) {
+        if (event.getOption("group") == null) {
+            event.reply("Group name is required.").setEphemeral(true).queue();
+            return;
+        }
+
         String groupName = event.getOption("group").getAsString();
 
-        // Get the member who executed the command
         Member member = event.getMember();
         if (member == null) {
             event.reply("Could not identify user.").setEphemeral(true).queue();
             return;
         }
 
-        // Check if the user is in a Discord voice channel
         if (member.getVoiceState() == null || !member.getVoiceState().inAudioChannel()) {
             event.reply("You must be in a Discord voice channel to use this command.").setEphemeral(true).queue();
+            return;
+        }
+
+        if (member.getVoiceState().getChannel() == null) {
+            event.reply("Could not find your voice channel.").setEphemeral(true).queue();
             return;
         }
 
@@ -81,24 +97,62 @@ public class CommandHandler extends ListenerAdapter {
             return;
         }
 
-        AudioManager manager = event.getGuild().getAudioManager();
+        if (event.getGuild() == null) {
+            event.reply("This command must be used in a server.").setEphemeral(true).queue();
+            return;
+        }
 
-        //manager.setSendingHandler(new MySendHandler());
+        AudioManager manager = event.getGuild().getAudioManager();
         manager.openAudioConnection(voiceChannel);
 
-
-        event.reply("Join command received for group: " + group.getName() + " from voice channel: " + voiceChannel.getName() + " (not yet implemented)").setEphemeral(true).queue();
+        try {
+            AudioBridge bridge = botInstance.createAudioBridge(group, voiceChannel);
+            if (bridge != null) {
+                SvcDiscordIntegration.LOGGER.info("Successfully bridged Discord channel '{}' with SVC group '{}'",
+                    voiceChannel.getName(), group.getName());
+                event.reply("Successfully joined! Audio is now bridged between Discord channel '" +
+                    voiceChannel.getName() + "' and SVC group '" + group.getName() + "'").queue();
+            } else {
+                event.reply("Failed to create audio bridge. Check server logs.").setEphemeral(true).queue();
+            }
+        } catch (Exception e) {
+            SvcDiscordIntegration.LOGGER.error("Error creating audio bridge", e);
+            event.reply("Error creating audio bridge: " + e.getMessage()).setEphemeral(true).queue();
+        }
     }
 
     private void handleLeaveCommand(SlashCommandInteractionEvent event) {
-        String group = event.getOption("group") != null
+        String groupName = event.getOption("group") != null
             ? event.getOption("group").getAsString()
             : null;
 
+        if (groupName == null) {
+            event.reply("Group name is required.").setEphemeral(true).queue();
+            return;
+        }
+
+        Group group = SvcPlugin.groups.stream()
+                .filter(g -> g.getName().equals(groupName))
+                .findFirst()
+                .orElse(null);
+
         if (group == null) {
-            event.reply("Leave command received (not yet implemented)").setEphemeral(true).queue();
-        } else {
-            event.reply("Leave command received for group: " + group + " (not yet implemented)").setEphemeral(true).queue();
+            event.reply("Group not found: " + groupName).setEphemeral(true).queue();
+            return;
+        }
+
+        try {
+            botInstance.destroyAudioBridge(group);
+
+            if (event.getGuild() != null) {
+                event.getGuild().getAudioManager().closeAudioConnection();
+            }
+
+            SvcDiscordIntegration.LOGGER.info("Disconnected audio bridge for group '{}'", group.getName());
+            event.reply("Successfully disconnected from SVC group '" + group.getName() + "'").queue();
+        } catch (Exception e) {
+            SvcDiscordIntegration.LOGGER.error("Error destroying audio bridge", e);
+            event.reply("Error disconnecting: " + e.getMessage()).setEphemeral(true).queue();
         }
     }
 }

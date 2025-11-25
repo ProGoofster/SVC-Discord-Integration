@@ -1,13 +1,11 @@
 package com.jakeberryman.svcdiscordintegration.voicechat;
 
 import com.jakeberryman.svcdiscordintegration.SvcDiscordIntegration;
+import com.jakeberryman.svcdiscordintegration.audio.AudioBridgeRegistry;
 import com.jakeberryman.svcdiscordintegration.config.Config;
 import com.jakeberryman.svcdiscordintegration.discord.BotInstance;
 import de.maxhenkel.voicechat.api.*;
-import de.maxhenkel.voicechat.api.events.EventRegistration;
-import de.maxhenkel.voicechat.api.events.CreateGroupEvent;
-import de.maxhenkel.voicechat.api.events.RemoveGroupEvent;
-import de.maxhenkel.voicechat.api.events.VoicechatServerStartedEvent;
+import de.maxhenkel.voicechat.api.events.*;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -21,9 +19,11 @@ public class SvcPlugin implements VoicechatPlugin {
 
     public static List<Group> groups = new ArrayList<>();
 
-    private BotInstance bot;
+    public static BotInstance bot;
 
     public static VolumeCategory discordPlayer;
+
+    private final SvcAudioListener audioListener = new SvcAudioListener();
 
     @Override
     public String getPluginId() {
@@ -40,6 +40,9 @@ public class SvcPlugin implements VoicechatPlugin {
         registration.registerEvent(VoicechatServerStartedEvent.class, this::onServerStarted);
         registration.registerEvent(CreateGroupEvent.class, this::onGroupCreated);
         registration.registerEvent(RemoveGroupEvent.class, this::onGroupRemoved);
+        registration.registerEvent(JoinGroupEvent.class, this::onPlayerJoinedGroup);
+        registration.registerEvent(LeaveGroupEvent.class, this::onPlayerLeftGroup);
+        registration.registerEvent(MicrophonePacketEvent.class, audioListener::onMicrophonePacket);
     }
 
     private void onServerStarted(VoicechatServerStartedEvent event) {
@@ -64,6 +67,26 @@ public class SvcPlugin implements VoicechatPlugin {
 
     private void onGroupRemoved(RemoveGroupEvent event){
         groups.remove(event.getGroup());
+        // Clean up any audio bridge for this group
+        AudioBridgeRegistry.unregisterBridge(event.getGroup().getId());
+    }
+
+    private void onPlayerJoinedGroup(JoinGroupEvent event) {
+        // Add player to audio bridge when they join a group
+        AudioBridgeRegistry.getBridgeByGroup(event.getGroup()).ifPresent(bridge -> {
+            bridge.addConnection(event.getConnection());
+            SvcDiscordIntegration.LOGGER.info("Player {} joined bridged group {}",
+                event.getConnection().getPlayer().getUuid(), event.getGroup().getName());
+        });
+    }
+
+    private void onPlayerLeftGroup(LeaveGroupEvent event) {
+        // Remove player from audio bridge when they leave a group
+        AudioBridgeRegistry.getBridgeByGroup(event.getGroup()).ifPresent(bridge -> {
+            bridge.removeConnection(event.getConnection());
+            SvcDiscordIntegration.LOGGER.info("Player {} left bridged group {}",
+                event.getConnection().getPlayer().getUuid(), event.getGroup().getName());
+        });
     }
 
 }
