@@ -43,8 +43,10 @@ public class SvcPlugin implements VoicechatPlugin {
     }
 
     private void onServerStarted(VoicechatServerStartedEvent event) {
+        SERVER_API = event.getVoicechat();
+
         discordPlayer = SERVER_API.volumeCategoryBuilder()
-                .setId("DISCORD")
+                .setId("discord")
                 .setName("Discord")
                 .setNameTranslationKey("audioplayer.category.music_discs")
                 .setDescription("The volume of all custom music discs")
@@ -52,8 +54,6 @@ public class SvcPlugin implements VoicechatPlugin {
                 //.setIcon()
                 .build();
 
-
-        SERVER_API = event.getVoicechat();
         bot = new BotInstance(1, Config.getToken());
         bot.startBot();
     }
