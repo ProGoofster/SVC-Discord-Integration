@@ -1,0 +1,29 @@
+modLoader = "javafml"
+loaderVersion = "[47,)"
+#issueTrackerURL = ""
+license = "GNU GPL 3.0"
+
+[[mods]]
+modId = "svcdiscordintegration"
+version = "${version}"
+displayName = "Simple Voice Chat Discord Integration"
+authors = ""
+description = '''
+
+'''
+#logoFile = ""
+
+[[dependencies.svcdiscordintegration]]
+modId = "forge"
+mandatory = true
+versionRange = "[47,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.svcdiscordintegration]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[1.20.1,)"
+ordering = "NONE"
+side = "BOTH"
+

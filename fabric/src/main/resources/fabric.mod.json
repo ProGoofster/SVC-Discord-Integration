@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "svcdiscordintegration",
+  "version": "${version}",
+  "name": "Simple Voice Chat Discord Integration",
+  "description": "",
+  "authors": [
+    ""
+  ],
+  "contact": {
+    "homepage": ""
+  },
+  "license": "GPL-3.0",
+  "icon": "assets/svcdiscordintegration/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.jakeberryman.svcdiscordintegration.fabric.SvcDiscordIntegrationFabric"
+    ],
+    "client": [
+      "com.jakeberryman.svcdiscordintegration.fabric.client.SvcDiscordIntegrationFabricClient"
+    ]
+  },
+  "mixins": [
+    "svcdiscordintegration.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.18.1",
+    "minecraft": "~1.20.1",
+    "java": ">=17"
+  },
+  "suggests": {
+    "another-mod": "*"
+  }
+}
