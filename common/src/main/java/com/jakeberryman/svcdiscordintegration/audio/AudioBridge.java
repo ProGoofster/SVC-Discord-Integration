@@ -7,7 +7,7 @@ import com.jakeberryman.svcdiscordintegration.voicechat.SvcPlugin;
 import de.maxhenkel.voicechat.api.Group;
 import de.maxhenkel.voicechat.api.VoicechatConnection;
 import de.maxhenkel.voicechat.api.audiochannel.StaticAudioChannel;
-import de.maxhenkel.voicechat.api.opus.OpusEncoder;
+import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel;
 import net.dv8tion.jda.api.managers.AudioManager;
 
@@ -25,7 +25,6 @@ public class AudioBridge {
     private final DiscordAudioSendHandler sendHandler;
 
     private StaticAudioChannel svcAudioChannel;
-    private OpusEncoder opusEncoder;
     private final Set<VoicechatConnection> groupConnections = ConcurrentHashMap.newKeySet();
     private volatile boolean active = false;
 
@@ -35,7 +34,10 @@ public class AudioBridge {
         this.discordAudioManager = discordAudioManager;
 
         this.sendHandler = new DiscordAudioSendHandler();
-        this.receiveHandler = new DiscordAudioReceiveHandler(this::onDiscordAudioReceived);
+        this.receiveHandler = new DiscordAudioReceiveHandler(
+            discordChannel.getGuild().getJDA(),
+            this::onDiscordUserAudioReceived
+        );
     }
 
     public void start() {
@@ -48,8 +50,12 @@ public class AudioBridge {
         UUID channelId = UUID.randomUUID();
         svcAudioChannel = SvcPlugin.SERVER_API.createStaticAudioChannel(channelId);
 
-        // Create an Opus encoder for encoding Discord PCM audio
-        opusEncoder = SvcPlugin.SERVER_API.createEncoder();
+        if (svcAudioChannel != null) {
+            svcAudioChannel.setCategory(SvcPlugin.discordPlayer.getId());
+            SvcDiscordIntegration.LOGGER.info("Set audio channel category to: {}", SvcPlugin.discordPlayer.getId());
+        } else {
+            SvcDiscordIntegration.LOGGER.error("Failed to create static audio channel!");
+        }
 
         discordAudioManager.setReceivingHandler(receiveHandler);
         discordAudioManager.setSendingHandler(sendHandler);
@@ -58,7 +64,7 @@ public class AudioBridge {
         sendHandler.setActive(true);
         active = true;
 
-        SvcDiscordIntegration.LOGGER.info("Audio bridge started successfully - connections will be added as players join the group");
+        SvcDiscordIntegration.LOGGER.info("Audio bridge started - forwarding raw Opus audio between Discord and SVC");
     }
 
     public void stop() {
@@ -71,10 +77,6 @@ public class AudioBridge {
 
         if (svcAudioChannel != null) {
             svcAudioChannel.clearTargets();
-        }
-
-        if (opusEncoder != null && !opusEncoder.isClosed()) {
-            opusEncoder.close();
         }
 
         sendHandler.clearQueue();
@@ -109,23 +111,19 @@ public class AudioBridge {
         groupConnections.forEach(svcAudioChannel::addTarget);
     }
 
-    private void onDiscordAudioReceived(byte[] audioData) {
-        if (!active || svcAudioChannel == null || opusEncoder == null) return;
+    private void onDiscordUserAudioReceived(User user, byte[] opusData) {
+        if (!active || svcAudioChannel == null) return;
 
         try {
-            // Discord provides 48kHz 16-bit stereo PCM (BigEndian)
-            // Convert to short array and downmix stereo to mono
-            short[] pcmStereo = bytesToShorts(audioData);
-            short[] pcmMono = stereoToMono(pcmStereo);
-
-            // Encode to Opus
-            byte[] opusData = opusEncoder.encode(pcmMono);
-
-            // Send Opus-encoded audio to all group members
+            // Discord sends raw Opus-encoded audio per user (48kHz mono, 20ms frames)
+            // Forward directly to SVC without decoding - both systems use Opus
             svcAudioChannel.send(opusData);
 
+            SvcDiscordIntegration.LOGGER.info("Forwarded {} bytes of Opus audio from Discord user {} to SVC ({} targets)",
+                opusData.length, user.getName(), groupConnections.size());
+
         } catch (Exception e) {
-            SvcDiscordIntegration.LOGGER.error("Error processing Discord audio for SVC", e);
+            SvcDiscordIntegration.LOGGER.error("Error forwarding Discord user audio to SVC", e);
         }
     }
 
@@ -133,31 +131,11 @@ public class AudioBridge {
         if (!active) return;
 
         try {
-            // SVC provides Opus-encoded data, send directly to Discord
+            // SVC provides raw Opus-encoded data, forward directly to Discord without encoding
             sendHandler.queueAudio(opusData);
         } catch (Exception e) {
-            SvcDiscordIntegration.LOGGER.error("Error processing SVC audio for Discord", e);
+            SvcDiscordIntegration.LOGGER.error("Error forwarding SVC audio to Discord", e);
         }
-    }
-
-    private short[] bytesToShorts(byte[] bytes) {
-        short[] shorts = new short[bytes.length / 2];
-        for (int i = 0; i < shorts.length; i++) {
-            // Discord uses BigEndian format
-            shorts[i] = (short) ((bytes[i * 2] << 8) | (bytes[i * 2 + 1] & 0xFF));
-        }
-        return shorts;
-    }
-
-    private short[] stereoToMono(short[] stereo) {
-        short[] mono = new short[stereo.length / 2];
-        for (int i = 0; i < mono.length; i++) {
-            // Average left and right channels
-            int left = stereo[i * 2];
-            int right = stereo[i * 2 + 1];
-            mono[i] = (short) ((left + right) / 2);
-        }
-        return mono;
     }
 
     public boolean isActive() {

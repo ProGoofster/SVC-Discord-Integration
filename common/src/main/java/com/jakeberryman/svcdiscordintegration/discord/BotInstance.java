@@ -1,6 +1,7 @@
 package com.jakeberryman.svcdiscordintegration.discord;
 
 
+import club.minnced.opus.util.OpusLibrary;
 import com.jakeberryman.svcdiscordintegration.SvcDiscordIntegration;
 import com.jakeberryman.svcdiscordintegration.audio.AudioBridge;
 import com.jakeberryman.svcdiscordintegration.audio.AudioBridgeRegistry;
@@ -30,6 +31,18 @@ public class BotInstance {
     }
 
     public void startBot() {
+        // Pre-load Opus from system library to avoid JDA trying to load from JAR
+        // This works around Forge's module system preventing opus-java-api from accessing opus-java-natives
+        try {
+            if (!OpusLibrary.isInitialized()) {
+                SvcDiscordIntegration.LOGGER.info("Loading Opus from system library...");
+                OpusLibrary.loadFrom("/usr/lib/libopus.so");
+                SvcDiscordIntegration.LOGGER.info("Successfully loaded Opus from system library");
+            }
+        } catch (Exception e) {
+            SvcDiscordIntegration.LOGGER.error("Failed to load Opus from system library", e);
+        }
+
         api = JDABuilder.createDefault(token)
                 .setActivity(Activity.playing("hello from minecraft"))
                 .addEventListeners(commandHandler, eventHandler)

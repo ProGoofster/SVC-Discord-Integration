@@ -42,14 +42,17 @@ dependencies {
     shadowBundle project(path: ':common', configuration: 'transformProductionForge')
 
     forgeRuntimeLibrary("net.dv8tion:JDA:${jda_version}") {
-        exclude module: 'opus-java'
-        exclude group: 'com.iwebpp.crypto'
-    }
-    shadowBundle("net.dv8tion:JDA:${jda_version}") {
-        exclude module: 'opus-java'
         exclude group: 'com.iwebpp.crypto'
     }
 
+    // Explicitly include opus-java-natives (transitive dep isn't working)
+    forgeRuntimeLibrary "club.minnced:opus-java-natives:1.1.1"
+
+    shadowBundle("net.dv8tion:JDA:${jda_version}") {
+        exclude group: 'com.iwebpp.crypto'
+    }
+
+    shadowBundle "club.minnced:opus-java-natives:1.1.1"
 
     implementation "de.maxhenkel.voicechat:voicechat-api:$rootProject.voicechat_api_version"
     // Use modRuntimeOnly instead of runtimeOnly to prevent classpath pollution
@@ -73,6 +76,7 @@ shadowJar {
     archiveClassifier = 'dev-shadow'
 
     // Relocate JDA and its dependencies to avoid conflicts
+    // NOTE: Do NOT relocate club.minnced.opus - it needs to find native libraries at hardcoded paths
     def relocateLocation = "${project.group}.shadow"
     def relocations = [
         'net.dv8tion.jda',
@@ -82,8 +86,7 @@ shadowJar {
         'org.slf4j',
         'com.neovisionaries.ws',
         'gnu.trove',
-        'org.apache.commons.collections4',
-        'club.minnced.opus'
+        'org.apache.commons.collections4'
     ]
 
     relocations.each { pkg ->
@@ -95,6 +98,9 @@ shadowJar {
     exclude 'META-INF/*.SF'
     exclude 'META-INF/*.DSA'
     exclude 'META-INF/*.RSA'
+
+    // Ensure native libraries are included
+    mergeServiceFiles()
 }
 
 remapJar {
